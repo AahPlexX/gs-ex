@@ -30,6 +30,12 @@ const normalizeExportRequest = (message) => {
   return { tabId: message.tabId, formats };
 };
 
+const createExportSuccess = (formats) => ({
+  ok: true,
+  count: formats.length,
+  formats: [...formats],
+});
+
 const setActionState = async (tabId, text, title) => {
   await Promise.all([
     chrome.action.setBadgeText({ tabId, text }),
@@ -107,14 +113,14 @@ const exportArtifact = async ({ tabId, formats }) => {
   }
 
   await downloadExports(capture, formats);
-  const count = formats.length;
+  const response = createExportSuccess(formats);
   await setActionState(
     tabId,
-    String(count),
-    `Exported ${count} ${count === 1 ? "file" : "files"}.`,
+    String(response.count),
+    `Exported ${response.count} ${response.count === 1 ? "file" : "files"}.`,
   );
 
-  return { ok: true, count, formats };
+  return response;
 };
 
 const toErrorMessage = (error) =>
@@ -148,6 +154,7 @@ if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
 
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
+    createExportSuccess,
     normalizeExportRequest,
   };
 }
