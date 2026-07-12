@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Genspark Exporter",
-  "description": "Exports the active Genspark artifact as JSON, Markdown, standalone HTML, or a complete bundle.",
-  "version": "0.3.0",
+  "description": "Exports Genspark artifacts locally and can generate an optional sanitized structural diagnostic.",
+  "version": "0.4.0",
   "permissions": [
     "activeTab",
     "downloads",
