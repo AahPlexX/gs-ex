@@ -6,6 +6,24 @@ const {
   createArtifactCapture,
   normalizeText,
 } = require("../extractor.js");
+const { serializeCapture } = require("../serializers.js");
+
+const createSampleCapture = (overrides = {}) =>
+  createArtifactCapture({
+    url: "https://www.genspark.ai/slides/example",
+    pathname: "/slides/example",
+    documentTitle: "Product Launch",
+    headingTitle: "Product Launch",
+    language: "en",
+    description: "A launch deck",
+    mainText: "Intro Details",
+    headings: [{ level: 2, text: "Overview" }],
+    links: [{ text: "Source", url: "/sources/1" }],
+    images: [{ alt: "Diagram", url: "/assets/diagram.png", width: 640, height: 480 }],
+    slides: [{ text: "First slide", images: ["/assets/slide.png"] }],
+    capturedAt: "2026-07-12T12:00:00.000Z",
+    ...overrides,
+  });
 
 test("classifyArtifact recognizes supported Genspark artifact families", () => {
   const cases = [
@@ -27,19 +45,15 @@ test("normalizeText collapses whitespace and tolerates empty values", () => {
 });
 
 test("createArtifactCapture emits a normalized schema-versioned contract", () => {
-  const capture = createArtifactCapture({
-    url: "https://www.genspark.ai/slides/example",
-    pathname: "/slides/example",
+  const capture = createSampleCapture({
     documentTitle: "  Product\nLaunch  ",
     headingTitle: " Product Launch ",
-    language: "en",
     description: "  A launch deck  ",
     mainText: " Intro\n\nDetails ",
     headings: [{ level: 2, text: "  Overview " }],
     links: [{ text: " Source ", url: "/sources/1" }],
     images: [{ alt: " Diagram ", url: "/assets/diagram.png", width: 640, height: 480 }],
     slides: [{ text: " First slide ", images: ["/assets/slide.png"] }],
-    capturedAt: "2026-07-12T12:00:00.000Z",
   });
 
   assert.deepEqual(capture, {
@@ -75,4 +89,68 @@ test("createArtifactCapture emits a normalized schema-versioned contract", () =>
       ],
     },
   });
+});
+
+test("serializeCapture returns deterministic metadata for every supported format", () => {
+  const capture = createSampleCapture();
+  const cases = [
+    ["json", "genspark.json", "application/json"],
+    ["markdown", "md", "text/markdown"],
+    ["html", "html", "text/html"],
+  ];
+
+  for (const [format, extension, mimeType] of cases) {
+    const serialized = serializeCapture(capture, format);
+    assert.equal(serialized.extension, extension);
+    assert.equal(serialized.mimeType, mimeType);
+    assert.equal(typeof serialized.content, "string");
+    assert.ok(serialized.content.length > 0);
+  }
+
+  assert.deepEqual(JSON.parse(serializeCapture(capture, "json").content), capture);
+});
+
+test("Markdown serialization preserves content and excludes unsafe URLs", () => {
+  const capture = createSampleCapture({
+    headingTitle: "Roadmap [Draft]",
+    description: "Use *carefully*",
+    links: [
+      { text: "Safe [source]", url: "https://example.com/reference" },
+      { text: "Unsafe", url: "javascript:alert(1)" },
+    ],
+    images: [
+      { alt: "Safe image", url: "https://example.com/image.png", width: 10, height: 10 },
+      { alt: "Unsafe image", url: "javascript:alert(2)", width: 10, height: 10 },
+    ],
+  });
+
+  const markdown = serializeCapture(capture, "markdown").content;
+
+  assert.ok(markdown.startsWith("# Roadmap \\[Draft\\]"));
+  assert.ok(markdown.includes("Use \\*carefully\\*"));
+  assert.match(markdown, /https:\/\/example\.com\/reference/);
+  assert.match(markdown, /https:\/\/example\.com\/image\.png/);
+  assert.doesNotMatch(markdown, /javascript:/i);
+});
+
+test("HTML serialization escapes page data and emits no executable script", () => {
+  const capture = createSampleCapture({
+    headingTitle: '<img src=x onerror="alert(1)">',
+    description: "<script>alert(2)</script>",
+    links: [{ text: "Unsafe", url: "javascript:alert(3)" }],
+  });
+
+  const html = serializeCapture(capture, "html").content;
+
+  assert.match(html, /Content-Security-Policy/);
+  assert.match(html, /default-src &#39;none&#39;/);
+  assert.match(html, /&lt;img src=x onerror=&quot;alert\(1\)&quot;&gt;/);
+  assert.match(html, /&lt;script&gt;alert\(2\)&lt;\/script&gt;/);
+  assert.doesNotMatch(html, /<script/i);
+  assert.doesNotMatch(html, /javascript:/i);
+});
+
+test("serializeCapture rejects malformed captures and unsupported formats", () => {
+  assert.throws(() => serializeCapture(null, "json"), /schema version 1 capture/i);
+  assert.throws(() => serializeCapture(createSampleCapture(), "pdf"), /unsupported export format/i);
 });
