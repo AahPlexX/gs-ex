@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { createExportMessage } = require("../popup.js");
+const { createDiagnosticMessage, createExportMessage } = require("../popup.js");
 const {
   classifyArtifact,
   createArtifactCapture,
@@ -34,7 +34,13 @@ const loadServiceWorkerApi = () => {
   return api;
 };
 
-const { createExportSuccess, normalizeExportRequest } = loadServiceWorkerApi();
+const {
+  createDiagnosticFilename,
+  createDiagnosticSuccess,
+  createExportSuccess,
+  normalizeDiagnosticRequest,
+  normalizeExportRequest,
+} = loadServiceWorkerApi();
 
 const createSampleCapture = (overrides = {}) =>
   createArtifactCapture({
@@ -255,6 +261,8 @@ test("sanitizeIdentifier preserves structural tokens and rejects sensitive value
     ["550e8400-e29b-41d4-a716-446655440000", null],
     ["123456789012345", null],
     ["token=secret-value", null],
+    ["data:text/plain,secret", null],
+    ["QWxhZGRpbjpvcGVuIHNlc2FtZQ==", null],
     ["customer-project", null],
   ];
 
@@ -317,6 +325,7 @@ test("createDiagnosticSnapshot excludes private content and enforces determinist
   const serialized = JSON.stringify(snapshot);
   for (const forbidden of [
     "Secret Product Launch",
+    "Secret Launch Deck",
     "Confidential quarterly launch",
     "Other private content",
     "person@example.com",
@@ -338,4 +347,42 @@ test("createDiagnosticSnapshot excludes private content and enforces determinist
     { name: "data-testid", value: "slide-card" },
     { name: "data-token", value: null },
   ]);
+});
+
+test("createDiagnosticMessage and normalizeDiagnosticRequest share the diagnostic request contract", () => {
+  assert.deepEqual(createDiagnosticMessage(11), { type: "capture-diagnostic", tabId: 11 });
+  assert.deepEqual(normalizeDiagnosticRequest(createDiagnosticMessage(11)), { tabId: 11 });
+});
+
+test("diagnostic request helpers reject malformed input and create safe response metadata", () => {
+  assert.throws(() => createDiagnosticMessage(0), /tab id/i);
+  assert.throws(
+    () => normalizeDiagnosticRequest({ type: "export-artifact", tabId: 11 }),
+    /unsupported message type/i,
+  );
+  assert.throws(
+    () => normalizeDiagnosticRequest({ type: "capture-diagnostic", tabId: 0 }),
+    /tab id/i,
+  );
+  assert.deepEqual(createDiagnosticSuccess(), { ok: true, count: 1, kind: "diagnostic" });
+  assert.equal(
+    createDiagnosticFilename("2026-07-12T12:00:00.000Z"),
+    "genspark-diagnostic-2026-07-12T12-00-00-000Z.json",
+  );
+  assert.throws(() => createDiagnosticFilename("not-a-date"), /valid capture timestamp/i);
+});
+
+test("popup exposes a distinct local sanitized diagnostic control", () => {
+  const html = require("node:fs").readFileSync(require("node:path").join(__dirname, "..", "popup.html"), "utf8");
+
+  for (const required of [
+    'id="diagnostic-button"',
+    'type="button"',
+    "Download sanitized diagnostic",
+    "No artifact text or titles are included",
+    'src="popup.js"',
+  ]) {
+    assert.ok(html.includes(required), `Missing popup contract: ${required}`);
+  }
+  assert.doesNotMatch(html, /<script(?![^>]*\bsrc=)/i);
 });
