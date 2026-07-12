@@ -6,17 +6,27 @@ Google Chrome extension that exports user-opened Genspark artifacts to local fil
 
 ## Current phase
 
-Phase 1: generic structured capture. A user clicks the extension action while viewing a Genspark artifact and receives a local `.genspark.json` snapshot.
+Phase 1: generic structured capture with a reusable extraction contract. A user clicks the extension action while viewing a Genspark artifact and receives a local `.genspark.json` snapshot.
 
 ## Entry points
 
 - `manifest.json` — Manifest V3 capability and permission source of truth.
-- `service-worker.js` — action handler, active-tab validation, DOM capture injection, artifact normalization, error state, filename sanitation, and download orchestration.
+- `service-worker.js` — action handler, active-tab validation, packaged extractor injection, error state, filename sanitation, and download orchestration.
+- `extractor.js` — DOM collection, artifact classification, normalization, URL resolution, and schema construction.
+
+## Extraction API
+
+`extractor.js` exposes `globalThis.GensparkExporter` in the injected page context and CommonJS exports in Node tests:
+
+- `captureArtifact()`
+- `classifyArtifact(input)`
+- `createArtifactCapture(input)`
+- `normalizeText(value)`
 
 ## Permissions
 
 - `activeTab` — temporary access only after the user clicks the extension action.
-- `scripting` — injects the bundled capture function into the active tab.
+- `scripting` — injects the bundled extraction module into the active tab.
 - `downloads` — saves the generated export locally.
 - No persistent `host_permissions` are currently declared.
 
@@ -39,11 +49,17 @@ Artifact types currently emitted:
 
 ## Commands
 
-There is currently no package manager, build step, linter, or automated test runner. The extension is plain bundled JavaScript and JSON and is loaded unpacked through `chrome://extensions`.
+There is no package manager, build step, or third-party test dependency.
+
+- Test: `node --test tests/extractor.test.js`
+- Syntax: `node --check extractor.js && node --check service-worker.js`
+- Runtime: load the repository unpacked through `chrome://extensions`.
 
 ## Verification
 
-Current manual verification path:
+Automated contract verification covers classification, whitespace normalization, relative URL resolution, title selection, and the exact schema-versioned output shape.
+
+Manual browser verification path:
 
 1. Enable Developer mode in `chrome://extensions`.
 2. Load the repository directory as an unpacked extension.
@@ -53,4 +69,4 @@ Current manual verification path:
 
 ## Next phase
 
-Add deterministic fixture-based contract tests without requiring a browser, then split site-specific extraction rules from generic fallback capture only after real Genspark DOM samples establish stable selectors. Native PPTX/PDF/HTML/Markdown export should consume the normalized contract rather than duplicate capture logic.
+Add Markdown and standalone HTML serializers that consume the normalized contract, with tests written before implementation. Site-specific selector rules remain deferred until real Genspark DOM samples establish stable evidence. Native PPTX and PDF export must consume the same contract rather than duplicate capture logic.
