@@ -15,6 +15,7 @@
 - `docs/superpowers/plans/2026-07-12-format-selection-popup.md` — recorded the bounded TDD plan for an accessible format-selection popup, validated runtime messages, and selected-format downloads.
 - `popup.html` — added the semantic action popup with a native radio group for JSON, Markdown, standalone HTML, or the complete bundle; one submit action; keyboard-visible focus; reduced-motion handling; and an accessible live status region.
 - `popup.js` — added the popup controller and pure `createExportMessage()` contract. It obtains the active tab after the action gesture, sends one validated runtime message, disables controls during work, and surfaces success or explicit failure without inline executable code.
+- `docs/superpowers/specs/2026-07-12-observed-genspark-extraction-design.md` — added the evidence-first design for a local sanitized structural diagnostic that enables authenticated Genspark selector discovery without raw content, broader permissions, network interception, or guessed DOM assumptions.
 
 ### Changed
 
@@ -28,6 +29,7 @@
 - `service-worker.js` — replaced action-click execution with a top-level `runtime.onMessage` route required by a declared action popup. The worker validates message type, tab ID, and formats; ignores unrelated messages; returns literal `true` for asynchronous responses; captures once; downloads only the selected formats; and returns explicit success or failure metadata.
 - `manifest.json` — declared `popup.html`, updated the description, and incremented the extension version to `0.3.0`. The permissions remain exactly `activeTab`, `downloads`, and `scripting`, with no persistent host permission.
 - `repo-map.md` — updated the current phase, popup entry points, runtime message contract, selected-format behavior, verification commands, and authenticated-fixture next phase.
+- `docs/superpowers/specs/2026-07-12-observed-genspark-extraction-design.md` — corrected the initial diagnostic filename design during self-review so neither the payload nor download path can expose document titles, project identifiers, query strings, or user-entered content; the final design uses a fixed prefix plus UTC timestamp.
 
 ### Verification
 
@@ -44,3 +46,5 @@
 - Confirmed syntax with `node --check extractor.js`, `node --check serializers.js`, `node --check service-worker.js`, and `node --check popup.js`.
 - Confirmed `manifest.json` parses, declares `popup.html`, and preserves exactly the `activeTab`, `downloads`, and `scripting` permissions.
 - Confirmed the popup contains the export form, all four selection values, an external deferred script, and a polite live status region with no inline executable script.
+- Reconciled the observed-extraction design against current official Chrome scripting, active-tab, and messaging documentation plus current official Genspark presentation, PowerPoint, document, report, and privacy pages.
+- Completed the design self-review with no placeholders, undefined interfaces, permission expansion, dependency addition, schema conflict, or remaining raw-title leakage in the diagnostic payload or filename contract.
