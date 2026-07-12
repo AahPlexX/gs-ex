@@ -2,22 +2,23 @@
 
 ## Product
 
-Google Chrome extension that exports user-opened Genspark artifacts to local files. The target scope includes Slides, Pages, Documents, and newly encountered artifact types through a normalized capture contract.
+Google Chrome extension that exports user-opened Genspark artifacts to local files. Target scope includes Slides, Pages, Documents, and newly encountered artifact types through a normalized capture contract.
 
 ## Current phase
 
-Phase 3: accessible selected-format export. Clicking the extension action opens a popup where the user chooses JSON, Markdown, standalone HTML, or a complete three-file bundle. One validated message captures the active Genspark artifact once and downloads only the requested formats.
+Phase 4: privacy-preserving structural diagnostics. The popup can export JSON, Markdown, standalone HTML, or a complete bundle, and can separately download a local sanitized diagnostic used to derive artifact-specific selectors from observed authenticated Genspark structure.
 
 ## Entry points
 
-- `manifest.json` — Manifest V3 capability, version, popup, and permission source of truth.
-- `popup.html` — semantic action-popup form and accessible status surface.
-- `popup.js` — selection-to-message mapping, active-tab lookup, runtime request, busy state, and result messaging.
-- `service-worker.js` — request validation, active-tab/host validation, packaged extractor injection, serializer orchestration, badge/error state, and selected-format downloads.
-- `extractor.js` — DOM collection, artifact classification, normalization, URL resolution, and schema construction.
+- `manifest.json` — Manifest V3 capability, version, popup, service worker, and permission source of truth.
+- `popup.html` — semantic export form, separate diagnostic action, privacy disclosure, and accessible status surface.
+- `popup.js` — export/diagnostic message construction, active-tab lookup, shared busy state, runtime requests, and result messaging.
+- `service-worker.js` — request validation, Genspark-host validation, packaged module injection, serialization/download orchestration, badge/error states, and timestamp-only diagnostic downloads.
+- `extractor.js` — generic DOM collection, artifact classification, normalization, URL resolution, and artifact schema construction.
 - `serializers.js` — schema validation plus JSON, Markdown, and safe standalone HTML serialization.
+- `diagnostics.js` — bounded structural collection and conservative privacy sanitization for evidence-based selector discovery.
 
-## Extraction API
+## Artifact extraction API
 
 `extractor.js` exposes `globalThis.GensparkExporter` in the injected page context and CommonJS exports in Node tests:
 
@@ -26,99 +27,135 @@ Phase 3: accessible selected-format export. Clicking the extension action opens 
 - `createArtifactCapture(input)`
 - `normalizeText(value)`
 
-## Serialization API
+Artifact schema version: `1`.
 
-`serializers.js` exposes `globalThis.GensparkSerializers` in the extension service worker and CommonJS exports in Node tests:
-
-- `serializeCapture(capture, format)`
-
-Supported formats and filename suffixes:
-
-- `json` → `.genspark.json`
-- `markdown` → `.md`
-- `html` → `.html`
-
-Rendered Markdown and HTML include only HTTP(S) links and image resources. Standalone HTML escapes all captured page data, contains no script, and declares a restrictive Content Security Policy.
-
-## Popup and message contract
-
-`popup.js` exposes `createExportMessage(selection, tabId)` in Node tests.
-
-Selections:
-
-- `json`
-- `markdown`
-- `html`
-- `bundle` → `json`, `markdown`, and `html`
-
-Runtime request:
-
-```text
-{ type: "export-artifact", tabId: positive integer, formats: non-empty supported string array }
-```
-
-Service-worker response:
-
-```text
-{ ok: true, count, formats }
-```
-
-or:
-
-```text
-{ ok: false, error }
-```
-
-The worker ignores unrelated messages, deduplicates formats, rejects malformed input, and returns literal `true` while the asynchronous response channel remains open.
-
-## Permissions
-
-- `activeTab` — temporary access after the user invokes the extension action.
-- `scripting` — injects the bundled extraction module into the selected tab.
-- `downloads` — saves generated exports locally.
-- No persistent `host_permissions` are declared.
-
-## Export contract
-
-Schema version: `1`.
-
-Top-level fields:
-
-- `schemaVersion`
-- `source`: application, URL, title, capture timestamp, and language.
-- `artifact`: detected type, title, description, visible text, headings, links, images, and slide candidates.
-
-Artifact types currently emitted:
+Artifact types:
 
 - `slides`
 - `page`
 - `document`
 - `unknown`
 
+## Serialization API
+
+`serializers.js` exposes `globalThis.GensparkSerializers` in the service worker and CommonJS exports in tests:
+
+- `serializeCapture(capture, format)`
+
+Formats:
+
+- `json` → `.genspark.json`
+- `markdown` → `.md`
+- `html` → `.html`
+
+Markdown and HTML retain only HTTP(S) links/resources. Standalone HTML escapes captured data, contains no script, and declares a restrictive Content Security Policy.
+
+## Diagnostic API
+
+`diagnostics.js` exposes `globalThis.GensparkDiagnostics` in the injected page context and CommonJS exports in tests:
+
+- `captureDiagnostic()`
+- `createDiagnosticSnapshot(input)`
+- `sanitizeIdentifier(value)`
+- `sanitizeUrlShape(value, baseUrl)`
+
+Diagnostic schema version: `1` through `diagnosticSchemaVersion`.
+
+Hard bounds:
+
+- Maximum scanned elements: `5000`
+- Maximum candidates: `150`
+- Maximum repeated structures: `50`
+- Maximum safe identifier length: `64`
+
+Privacy contract:
+
+- No raw artifact text or document titles are stored.
+- Text and title lengths may be stored as numeric metadata.
+- Emails, UUIDs, long numbers, long hex/base64-like values, data URLs, and token/session/auth-like values are rejected.
+- URLs are restricted to HTTPS Genspark origins and reduced to sanitized route shapes; queries, fragments, credentials, and private path segments are excluded.
+- Diagnostic collection makes no network request and reads no cookies, storage, request bodies, response bodies, or authentication state.
+
+Diagnostic output:
+
+```text
+Genspark Diagnostics/genspark-diagnostic-<UTC timestamp>.json
+```
+
+## Popup and message contracts
+
+Normal export request:
+
+```text
+{ type: "export-artifact", tabId: positive integer, formats: non-empty supported string array }
+```
+
+Normal export success:
+
+```text
+{ ok: true, count, formats }
+```
+
+Diagnostic request:
+
+```text
+{ type: "capture-diagnostic", tabId: positive integer }
+```
+
+Diagnostic success:
+
+```text
+{ ok: true, count: 1, kind: "diagnostic" }
+```
+
+Failure response:
+
+```text
+{ ok: false, error }
+```
+
+The top-level worker listener ignores unrelated messages, validates each request, returns literal `true` while its asynchronous response channel is open, and does not rely on in-memory state surviving service-worker restart.
+
+## Permissions
+
+- `activeTab` — temporary active-page access after the user invokes the extension action.
+- `scripting` — injects packaged extraction or diagnostic modules into the selected tab's main frame in the default isolated world.
+- `downloads` — saves generated exports and diagnostics locally.
+- No persistent `host_permissions` are declared.
+
 ## Commands
 
 There is no package manager, build step, or third-party test dependency.
 
 - Test: `node --test tests/extractor.test.js`
-- Syntax: `node --check extractor.js && node --check serializers.js && node --check service-worker.js && node --check popup.js`
+- Syntax: `node --check extractor.js && node --check serializers.js && node --check diagnostics.js && node --check service-worker.js && node --check popup.js`
 - Manifest parse: `node -e "JSON.parse(require('node:fs').readFileSync('manifest.json', 'utf8'))"`
 - Runtime: load the repository unpacked through `chrome://extensions`.
 
-## Verification
+## Automated verification
 
-Automated contract verification covers extraction, schema normalization, serializer safety, popup request construction, service-worker request validation, format deduplication, malformed-message rejection, and success-response metadata.
+The current suite covers:
 
-Manual browser verification path:
+- Artifact classification and normalized schema construction.
+- JSON, Markdown, and HTML safety/metadata.
+- Popup export and diagnostic request construction.
+- Service-worker request validation and response metadata.
+- Diagnostic identifier and URL sanitization.
+- Private-content exclusion and deterministic output caps.
+- Timestamp-only diagnostic filenames.
+- Static popup diagnostic structure and absence of inline executable script.
+
+## Manual browser verification
 
 1. Enable Developer mode in `chrome://extensions`.
-2. Load the repository directory as an unpacked extension.
-3. Open a Genspark artifact.
-4. Click the extension action and confirm the format popup opens.
-5. Export each single format and confirm exactly one matching file appears under `Downloads/Genspark Exports/<artifact title>/`.
-6. Export the complete bundle and confirm JSON, Markdown, and HTML files appear.
-7. Confirm the popup reports success or a specific failure and the action badge reports the exported file count.
-8. Open the HTML file and confirm captured content is readable without executable page scripts.
+2. Load the repository directory as an unpacked extension, or reload the existing unpacked installation.
+3. Open an authenticated Genspark artifact.
+4. Open the extension popup.
+5. Verify each normal export option still downloads the selected output(s).
+6. Select **Download sanitized diagnostic**.
+7. Confirm one timestamp-named JSON file appears under `Downloads/Genspark Diagnostics/`.
+8. Inspect the JSON before sharing it and confirm it contains structural metadata and numeric text lengths, not artifact text, titles, account data, or complete URLs.
 
 ## Next phase
 
-Capture authenticated, sanitized Genspark DOM fixtures for Slides, Pages, and Documents, then add only selector adapters supported by those observed fixtures. Asset packaging, PDF export, and PPTX feasibility work must continue to consume the same normalized contract rather than duplicate capture logic.
+Generate one diagnostic from an authenticated Genspark Slides editor, inspect its structural evidence, commit a sanitized fixture derived from it, and add one focused Slides selector adapter with generic-extractor fallback and fixture-driven tests. Repeat the evidence-first loop for Pages and Documents before asset packaging, PDF export, or PPTX recovery work.
