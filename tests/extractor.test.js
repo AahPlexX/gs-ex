@@ -8,6 +8,29 @@ const {
 } = require("../extractor.js");
 const { serializeCapture } = require("../serializers.js");
 
+const loadServiceWorkerApi = () => {
+  const originalChrome = global.chrome;
+  const originalImportScripts = global.importScripts;
+
+  global.importScripts = () => {};
+  global.chrome = {
+    action: {
+      onClicked: { addListener() {} },
+      setBadgeText: async () => {},
+      setTitle: async () => {},
+    },
+  };
+
+  delete require.cache[require.resolve("../service-worker.js")];
+  const api = require("../service-worker.js");
+
+  global.chrome = originalChrome;
+  global.importScripts = originalImportScripts;
+  return api;
+};
+
+const { normalizeExportRequest } = loadServiceWorkerApi();
+
 const createSampleCapture = (overrides = {}) =>
   createArtifactCapture({
     url: "https://www.genspark.ai/slides/example",
@@ -153,4 +176,38 @@ test("HTML serialization escapes page data and emits no executable script", () =
 test("serializeCapture rejects malformed captures and unsupported formats", () => {
   assert.throws(() => serializeCapture(null, "json"), /schema version 1 capture/i);
   assert.throws(() => serializeCapture(createSampleCapture(), "pdf"), /unsupported export format/i);
+});
+
+test("normalizeExportRequest accepts single and bundled formats and removes duplicates", () => {
+  assert.deepEqual(
+    normalizeExportRequest({ type: "export-artifact", tabId: 7, formats: ["json"] }),
+    { tabId: 7, formats: ["json"] },
+  );
+  assert.deepEqual(
+    normalizeExportRequest({
+      type: "export-artifact",
+      tabId: 7,
+      formats: ["json", "markdown", "html", "json"],
+    }),
+    { tabId: 7, formats: ["json", "markdown", "html"] },
+  );
+});
+
+test("normalizeExportRequest rejects malformed or unsupported requests", () => {
+  assert.throws(
+    () => normalizeExportRequest({ type: "other", tabId: 7, formats: ["json"] }),
+    /unsupported message type/i,
+  );
+  assert.throws(
+    () => normalizeExportRequest({ type: "export-artifact", tabId: 0, formats: ["json"] }),
+    /tab id/i,
+  );
+  assert.throws(
+    () => normalizeExportRequest({ type: "export-artifact", tabId: 7, formats: [] }),
+    /at least one export format/i,
+  );
+  assert.throws(
+    () => normalizeExportRequest({ type: "export-artifact", tabId: 7, formats: ["pdf"] }),
+    /unsupported export format/i,
+  );
 });
