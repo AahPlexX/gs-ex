@@ -97,6 +97,31 @@
     "tabpanel",
     "toolbar",
   ]);
+  const SAFE_ATTRIBUTE_NAMES = new Set([
+    "aria-controls",
+    "aria-current",
+    "aria-describedby",
+    "aria-expanded",
+    "aria-hidden",
+    "aria-label",
+    "aria-labelledby",
+    "aria-orientation",
+    "aria-selected",
+    "data-component",
+    "data-index",
+    "data-kind",
+    "data-page",
+    "data-role",
+    "data-slide",
+    "data-slot",
+    "data-state",
+    "data-test",
+    "data-test-id",
+    "data-testid",
+    "data-type",
+    "data-view",
+    "role",
+  ]);
   const DISPLAY_VALUES = new Set([
     "block",
     "contents",
@@ -148,10 +173,7 @@
 
   const sanitizeIdentifier = (value) => {
     const text = asText(value).trim();
-    if (
-      isSensitiveValue(text) ||
-      !/^[A-Za-z][A-Za-z0-9_-]*$/.test(text)
-    ) {
+    if (isSensitiveValue(text) || !/^[A-Za-z][A-Za-z0-9_-]*$/.test(text)) {
       return null;
     }
 
@@ -229,13 +251,11 @@
       : Object.entries(value && typeof value === "object" ? value : {});
 
     return entries
-      .filter(([name]) => /^(?:role|data-[a-z0-9_.:-]+|aria-[a-z0-9_.:-]+)$/i.test(asText(name)))
+      .map(([name, attributeValue]) => [asText(name).toLowerCase(), attributeValue])
+      .filter(([name]) => SAFE_ATTRIBUTE_NAMES.has(name))
       .map(([name, attributeValue]) => ({
-        name: asText(name).toLowerCase(),
-        value:
-          asText(name).toLowerCase() === "role"
-            ? sanitizeRole(attributeValue)
-            : sanitizeIdentifier(attributeValue),
+        name,
+        value: name === "role" ? sanitizeRole(attributeValue) : sanitizeIdentifier(attributeValue),
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
   };
