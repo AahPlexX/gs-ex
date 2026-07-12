@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Run tests
+        run: node --test tests/*.test.js
+
+      - name: Check JavaScript syntax
+        run: |
+          node --check extractor.js
+          node --check serializers.js
+          node --check diagnostics.js
+          node --check service-worker.js
+          node --check popup.js
+
+      - name: Verify manifest and popup contracts
+        run: |
+          node -e "const fs=require('node:fs'); const manifest=JSON.parse(fs.readFileSync('manifest.json','utf8')); const permissions=[...manifest.permissions].sort(); if(manifest.manifest_version!==3||manifest.action?.default_popup!=='popup.html'||JSON.stringify(permissions)!==JSON.stringify(['activeTab','downloads','scripting'])) process.exit(1);"
+          node -e "const fs=require('node:fs'); const html=fs.readFileSync('popup.html','utf8'); if(/<script(?![^>]*src=)/i.test(html)||!html.includes('src=\"popup.js\"')) process.exit(1);"
