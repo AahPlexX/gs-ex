@@ -1,4 +1,7 @@
+importScripts("serializers.js");
+
 const GENSPARK_HOSTS = new Set(["genspark.ai", "www.genspark.ai"]);
+const EXPORT_FORMATS = ["json", "markdown", "html"];
 
 const setActionState = async (tabId, text, title) => {
   await Promise.all([
@@ -33,6 +36,24 @@ const executeCapture = async (tabId) => {
   return result;
 };
 
+const downloadExportBundle = async (capture) => {
+  const basename = sanitizeFilename(capture.artifact.title);
+  const directory = `Genspark Exports/${basename}`;
+
+  for (const format of EXPORT_FORMATS) {
+    const { content, extension, mimeType } =
+      globalThis.GensparkSerializers.serializeCapture(capture, format);
+    const dataUrl = `data:${mimeType};charset=utf-8,${encodeURIComponent(content)}`;
+
+    await chrome.downloads.download({
+      url: dataUrl,
+      filename: `${directory}/${basename}.${extension}`,
+      saveAs: false,
+      conflictAction: "uniquify",
+    });
+  }
+};
+
 chrome.action.onClicked.addListener(async (tab) => {
   const tabId = tab.id;
 
@@ -62,19 +83,8 @@ chrome.action.onClicked.addListener(async (tab) => {
       throw new Error("No exportable artifact content was found on this page.");
     }
 
-    const filename = `${sanitizeFilename(result.artifact.title)}.genspark.json`;
-    const dataUrl = `data:application/json;charset=utf-8,${encodeURIComponent(
-      JSON.stringify(result, null, 2),
-    )}`;
-
-    await chrome.downloads.download({
-      url: dataUrl,
-      filename,
-      saveAs: true,
-      conflictAction: "uniquify",
-    });
-
-    await setActionState(tabId, "✓", "Genspark artifact exported.");
+    await downloadExportBundle(result);
+    await setActionState(tabId, "3", "Exported JSON, Markdown, and HTML.");
   } catch (error) {
     console.error("Genspark export failed", error);
     await setActionState(
