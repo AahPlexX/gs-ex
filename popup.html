@@ -101,6 +101,24 @@
         filter: brightness(1.08);
       }
 
+      button.secondary {
+        border: 1px solid color-mix(in oklch, CanvasText 32%, Canvas);
+        background: Canvas;
+        color: CanvasText;
+      }
+
+      .diagnostic {
+        display: grid;
+        gap: 0.5rem;
+        padding-block-start: 1rem;
+        border-block-start: 1px solid color-mix(in oklch, CanvasText 24%, Canvas);
+      }
+
+      .diagnostic h2 {
+        margin: 0;
+        font-size: 1rem;
+      }
+
       button:disabled,
       fieldset:disabled {
         cursor: progress;
@@ -181,6 +199,13 @@
         </fieldset>
 
         <button type="submit">Export selected format</button>
+
+        <section class="diagnostic" aria-labelledby="diagnostic-heading">
+          <h2 id="diagnostic-heading">Selector diagnostic</h2>
+          <p class="description">No artifact text or titles are included. The local JSON contains sanitized structural metadata only.</p>
+          <button id="diagnostic-button" class="secondary" type="button">Download sanitized diagnostic</button>
+        </section>
+
         <p id="status" role="status" aria-live="polite" aria-atomic="true"></p>
       </form>
     </main>
