@@ -1,6 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
+const { createExportMessage } = require("../popup.js");
 const {
   classifyArtifact,
   createArtifactCapture,
@@ -15,7 +16,6 @@ const loadServiceWorkerApi = () => {
   global.importScripts = () => {};
   global.chrome = {
     action: {
-      onClicked: { addListener() {} },
       setBadgeText: async () => {},
       setTitle: async () => {},
     },
@@ -29,7 +29,7 @@ const loadServiceWorkerApi = () => {
   return api;
 };
 
-const { normalizeExportRequest } = loadServiceWorkerApi();
+const { createExportSuccess, normalizeExportRequest } = loadServiceWorkerApi();
 
 const createSampleCapture = (overrides = {}) =>
   createArtifactCapture({
@@ -210,4 +210,34 @@ test("normalizeExportRequest rejects malformed or unsupported requests", () => {
     () => normalizeExportRequest({ type: "export-artifact", tabId: 7, formats: ["pdf"] }),
     /unsupported export format/i,
   );
+});
+
+test("createExportMessage maps one format or the complete bundle to the request contract", () => {
+  assert.deepEqual(createExportMessage("json", 11), {
+    type: "export-artifact",
+    tabId: 11,
+    formats: ["json"],
+  });
+  assert.deepEqual(createExportMessage("bundle", 11), {
+    type: "export-artifact",
+    tabId: 11,
+    formats: ["json", "markdown", "html"],
+  });
+  assert.deepEqual(normalizeExportRequest(createExportMessage("markdown", 11)), {
+    tabId: 11,
+    formats: ["markdown"],
+  });
+});
+
+test("createExportMessage rejects unsupported selections and invalid tab IDs", () => {
+  assert.throws(() => createExportMessage("pdf", 11), /unsupported export selection/i);
+  assert.throws(() => createExportMessage("json", 0), /tab id/i);
+});
+
+test("createExportSuccess returns serializable response metadata without sharing the input array", () => {
+  const formats = ["json", "html"];
+  const response = createExportSuccess(formats);
+
+  assert.deepEqual(response, { ok: true, count: 2, formats: ["json", "html"] });
+  assert.notEqual(response.formats, formats);
 });
