@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Genspark Exporter",
-  "description": "Exports the active Genspark artifact to a structured local file.",
-  "version": "0.1.0",
+  "description": "Exports the active Genspark artifact as JSON, Markdown, and standalone HTML.",
+  "version": "0.2.0",
   "permissions": [
     "activeTab",
     "downloads",
