@@ -37,7 +37,7 @@ The diagnostic is a development aid. It is not an additional end-user artifact f
 ## Non-goals
 
 - Do not add Slides, Pages, or Documents selectors before a diagnostic has been observed.
-- Do not capture raw artifact text, prompts, notes, comments, account data, or complete URLs.
+- Do not capture raw artifact text, prompts, notes, comments, account data, document titles, or complete URLs.
 - Do not inspect cookies, local storage, IndexedDB, request bodies, response bodies, or authentication tokens.
 - Do not enter the page's `MAIN` execution world unless isolated-world DOM evidence proves insufficient.
 - Do not add host permissions, `webRequest`, `debugger`, DevTools, or network interception.
@@ -94,8 +94,10 @@ Diagnostic capture will not be represented as an export format and will not pass
 The worker will validate the new message type, verify the tab and Genspark hostname, inject `diagnostics.js`, call `captureDiagnostic()`, and download one JSON file under:
 
 ```text
-Genspark Diagnostics/<sanitized artifact title>.genspark-diagnostic.json
+Genspark Diagnostics/genspark-diagnostic-<UTC timestamp>.json
 ```
+
+The filename must not include the artifact title, pathname, project identifier, or user-entered content.
 
 The listener will preserve the current asynchronous `return true` behavior and return one of:
 
@@ -158,6 +160,8 @@ The diagnostic will use its own contract and version:
 }
 ```
 
+`titleLength` is numeric metadata only. The title string itself is never stored.
+
 ### Structural candidates
 
 Collection will remain bounded and deterministic. Candidate elements will include:
@@ -186,7 +190,7 @@ Identifier and attribute values will be removed or replaced when they contain:
 
 Class names, IDs, roles, `data-*`, and `aria-*` values may be retained only when they pass the conservative safe-token rules. Attribute names may be retained even when their values are redacted.
 
-URLs will be reduced to origin plus a sanitized pathname shape. Query strings, fragments, credentials, and full signed resource paths will never be stored.
+URLs will be reduced to origin plus a sanitized pathname shape. Every path segment that resembles an identifier will be replaced with a stable placeholder. Query strings, fragments, credentials, full signed resource paths, titles, and user-entered content will never be stored.
 
 The diagnostic will not call external services and will be downloaded only to the user's device.
 
@@ -199,7 +203,7 @@ The diagnostic will not call external services and will be downloaded only to th
 5. `service-worker.js` validates the request and Genspark hostname.
 6. The worker injects packaged `diagnostics.js` into the main frame's default isolated world.
 7. `captureDiagnostic()` collects and sanitizes the structural model.
-8. The worker downloads the local diagnostic JSON.
+8. The worker downloads the local diagnostic JSON with a timestamp-only filename.
 9. The popup reports success or a specific failure.
 10. The owner can inspect and provide the diagnostic for the next selector-adapter phase.
 
@@ -224,12 +228,13 @@ Minimum sufficient coverage:
 
 - Safe identifiers survive unchanged.
 - Emails, UUIDs, long numbers, base64-like values, query strings, fragments, and data URLs are redacted.
-- Raw text is absent while text lengths remain.
+- Raw text and document titles are absent while numeric lengths remain.
 - Candidate and repeated-structure caps are enforced.
 - Diagnostic snapshots are deterministic for deterministic input.
 - Popup diagnostic messages validate positive tab IDs.
 - Service-worker diagnostic requests reject unrelated or malformed input.
 - Success metadata is serializable and distinct from artifact export metadata.
+- Diagnostic filenames contain only the fixed prefix and UTC timestamp.
 
 ### Test streamlining decision
 
@@ -240,7 +245,7 @@ Minimum sufficient coverage:
 ## Acceptance Criteria
 
 - No permission is added to `manifest.json`.
-- No raw artifact text appears anywhere in the diagnostic.
+- No raw artifact text or document title appears in the diagnostic payload or filename.
 - No query string, fragment, email, UUID, long numeric identifier, data URL, or token-like value appears in the diagnostic.
 - The diagnostic includes enough safe structural evidence to compare candidate slide/page/document containers.
 - The popup clearly separates normal exports from diagnostic capture.
