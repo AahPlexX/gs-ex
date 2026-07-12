@@ -16,6 +16,8 @@
 - `popup.html` — added the semantic action popup with a native radio group for JSON, Markdown, standalone HTML, or the complete bundle; one submit action; keyboard-visible focus; reduced-motion handling; and an accessible live status region.
 - `popup.js` — added the popup controller and pure `createExportMessage()` contract. It obtains the active tab after the action gesture, sends one validated runtime message, disables controls during work, and surfaces success or explicit failure without inline executable code.
 - `docs/superpowers/specs/2026-07-12-observed-genspark-extraction-design.md` — added the evidence-first design for a local sanitized structural diagnostic that enables authenticated Genspark selector discovery without raw content, broader permissions, network interception, or guessed DOM assumptions.
+- `docs/superpowers/plans/2026-07-12-sanitized-diagnostic.md` — recorded the complete TDD implementation plan for sanitized diagnostic collection, popup messaging, service-worker routing, privacy validation, and repository verification.
+- `diagnostics.js` — added the packaged local-only diagnostic module. It collects bounded structural evidence, retains only conservatively allowlisted structural tokens, reduces URLs to a Genspark origin and route shape, stores title/text lengths rather than content, caps output deterministically, and exposes pure helpers for Node tests.
 
 ### Changed
 
@@ -30,6 +32,12 @@
 - `manifest.json` — declared `popup.html`, updated the description, and incremented the extension version to `0.3.0`. The permissions remain exactly `activeTab`, `downloads`, and `scripting`, with no persistent host permission.
 - `repo-map.md` — updated the current phase, popup entry points, runtime message contract, selected-format behavior, verification commands, and authenticated-fixture next phase.
 - `docs/superpowers/specs/2026-07-12-observed-genspark-extraction-design.md` — corrected the initial diagnostic filename design during self-review so neither the payload nor download path can expose document titles, project identifiers, query strings, or user-entered content; the final design uses a fixed prefix plus UTC timestamp.
+- `popup.html` — added a visually secondary, keyboard-accessible diagnostic action inside the existing form plus explicit local-only privacy copy. The existing export controls and live status region remain the primary workflow.
+- `popup.js` — added `createDiagnosticMessage()`, shared active-tab/request orchestration, diagnostic busy/success/error states, and validation that the worker returns diagnostic-specific metadata. Existing export request behavior remains unchanged.
+- `service-worker.js` — added diagnostic request validation, shared Genspark-tab validation, packaged `diagnostics.js` injection in the default isolated world, local JSON download routing, timestamp-only filenames, explicit diagnostic badge/error states, and dual top-level message routing while preserving literal `true` for asynchronous responses.
+- `tests/extractor.test.js` — extended the existing dependency-free suite with diagnostic token/URL sanitization, private-content exclusion, deterministic caps, popup/worker message contracts, timestamp-only filename validation, and static popup structure checks. Coverage remains consolidated in one file for clarity.
+- `manifest.json` — incremented the extension version to `0.4.0` and disclosed the optional local sanitized diagnostic. Permissions remain exactly `activeTab`, `downloads`, and `scripting`, with no host permission or network capability added.
+- `repo-map.md` — updated the current phase, diagnostic module/API, privacy contract, message/response shapes, output path, verification commands, and next authenticated Slides diagnostic gate.
 
 ### Verification
 
@@ -48,3 +56,13 @@
 - Confirmed the popup contains the export form, all four selection values, an external deferred script, and a polite live status region with no inline executable script.
 - Reconciled the observed-extraction design against current official Chrome scripting, active-tab, and messaging documentation plus current official Genspark presentation, PowerPoint, document, report, and privacy pages.
 - Completed the design self-review with no placeholders, undefined interfaces, permission expansion, dependency addition, schema conflict, or remaining raw-title leakage in the diagnostic payload or filename contract.
+- Confirmed the diagnostic-module RED state: the existing twelve tests passed while new tests failed because `../diagnostics.js` did not exist.
+- Confirmed the first diagnostic GREEN state with `node --test tests/extractor.test.js`: all fifteen tests passed, followed by a successful `node --check diagnostics.js`.
+- Confirmed the diagnostic-request RED state: fifteen tests passed while two tests failed because the popup and service-worker diagnostic helpers did not exist.
+- Confirmed the diagnostic-request GREEN state with `node --test tests/extractor.test.js`: all seventeen tests passed; `popup.js` and `service-worker.js` passed syntax checks.
+- Confirmed the diagnostic-popup RED state: seventeen tests passed while the popup structure test failed because `diagnostic-button` did not exist.
+- Confirmed the final diagnostic GREEN state with `node --test tests/extractor.test.js`: all eighteen tests passed.
+- Confirmed syntax with `node --check extractor.js`, `node --check serializers.js`, `node --check diagnostics.js`, `node --check service-worker.js`, and `node --check popup.js`.
+- Confirmed the manifest is version `0.4.0`, declares `popup.html`, and preserves exactly the `activeTab`, `downloads`, and `scripting` permissions.
+- Confirmed the popup contains the external-script-only diagnostic action and privacy disclosure with no inline executable script.
+- Reconciled the implementation against current official Chrome `scripting`, `activeTab`, messaging, and downloads documentation; no permission or execution-world expansion was required.
