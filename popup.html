@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Genspark Exporter</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.5;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-width: 20rem;
+      }
+
+      main {
+        display: grid;
+        gap: 1rem;
+        padding: 1rem;
+      }
+
+      h1,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 1.125rem;
+      }
+
+      .description {
+        color: color-mix(in oklch, CanvasText 72%, Canvas);
+        font-size: 0.875rem;
+      }
+
+      form {
+        display: grid;
+        gap: 1rem;
+      }
+
+      fieldset {
+        display: grid;
+        gap: 0.5rem;
+        margin: 0;
+        padding: 0.75rem;
+        border: 1px solid color-mix(in oklch, CanvasText 28%, Canvas);
+        border-radius: 0.75rem;
+      }
+
+      legend {
+        padding-inline: 0.25rem;
+        font-weight: 650;
+      }
+
+      label {
+        display: flex;
+        gap: 0.625rem;
+        align-items: flex-start;
+        padding: 0.5rem;
+        border-radius: 0.5rem;
+        cursor: pointer;
+      }
+
+      label:hover {
+        background: color-mix(in oklch, AccentColor 12%, Canvas);
+      }
+
+      input {
+        margin-block-start: 0.25rem;
+      }
+
+      .option-copy {
+        display: grid;
+        gap: 0.125rem;
+      }
+
+      .option-copy small {
+        color: color-mix(in oklch, CanvasText 70%, Canvas);
+      }
+
+      button {
+        min-height: 2.75rem;
+        padding: 0.625rem 1rem;
+        border: 0;
+        border-radius: 0.625rem;
+        background: AccentColor;
+        color: AccentColorText;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      button:hover:not(:disabled) {
+        filter: brightness(1.08);
+      }
+
+      button:disabled,
+      fieldset:disabled {
+        cursor: progress;
+        opacity: 0.65;
+      }
+
+      :focus-visible {
+        outline: 0.1875rem solid AccentColor;
+        outline-offset: 0.1875rem;
+      }
+
+      #status {
+        min-height: 1.5rem;
+        font-size: 0.875rem;
+      }
+
+      #status[data-state="error"] {
+        color: light-dark(#9f1239, #fda4af);
+      }
+
+      #status[data-state="success"] {
+        color: light-dark(#166534, #86efac);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+    </style>
+    <script src="popup.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Export Genspark artifact</h1>
+        <p class="description">Choose one portable format or download the complete bundle.</p>
+      </header>
+
+      <form id="export-form" aria-busy="false">
+        <fieldset>
+          <legend>Export format</legend>
+
+          <label>
+            <input type="radio" name="format" value="bundle" checked>
+            <span class="option-copy">
+              <strong>Complete bundle</strong>
+              <small>JSON, Markdown, and standalone HTML</small>
+            </span>
+          </label>
+
+          <label>
+            <input type="radio" name="format" value="json">
+            <span class="option-copy">
+              <strong>Structured JSON</strong>
+              <small>Normalized data for reuse and automation</small>
+            </span>
+          </label>
+
+          <label>
+            <input type="radio" name="format" value="markdown">
+            <span class="option-copy">
+              <strong>Markdown</strong>
+              <small>Readable text for editors and documentation</small>
+            </span>
+          </label>
+
+          <label>
+            <input type="radio" name="format" value="html">
+            <span class="option-copy">
+              <strong>Standalone HTML</strong>
+              <small>Portable, script-free page for local viewing</small>
+            </span>
+          </label>
+        </fieldset>
+
+        <button type="submit">Export selected format</button>
+        <p id="status" role="status" aria-live="polite" aria-atomic="true"></p>
+      </form>
+    </main>
+  </body>
+</html>
