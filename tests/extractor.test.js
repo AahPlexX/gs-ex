@@ -8,6 +8,11 @@ const {
   normalizeText,
 } = require("../extractor.js");
 const { serializeCapture } = require("../serializers.js");
+const {
+  createDiagnosticSnapshot,
+  sanitizeIdentifier,
+  sanitizeUrlShape,
+} = require("../diagnostics.js");
 
 const loadServiceWorkerApi = () => {
   const originalChrome = global.chrome;
@@ -240,4 +245,97 @@ test("createExportSuccess returns serializable response metadata without sharing
 
   assert.deepEqual(response, { ok: true, count: 2, formats: ["json", "html"] });
   assert.notEqual(response.formats, formats);
+});
+
+test("sanitizeIdentifier preserves structural tokens and rejects sensitive values", () => {
+  const cases = [
+    ["slide-thumbnail", "slide-thumbnail"],
+    ["editorCanvas", "editorCanvas"],
+    ["person@example.com", null],
+    ["550e8400-e29b-41d4-a716-446655440000", null],
+    ["123456789012345", null],
+    ["token=secret-value", null],
+    ["customer-project", null],
+  ];
+
+  for (const [value, expected] of cases) {
+    assert.equal(sanitizeIdentifier(value), expected);
+  }
+});
+
+test("sanitizeUrlShape keeps only Genspark origin and structural route shape", () => {
+  assert.deepEqual(
+    sanitizeUrlShape(
+      "https://www.genspark.ai/slides/private-project?token=secret#page",
+      "https://www.genspark.ai",
+    ),
+    { origin: "https://www.genspark.ai", pathnameShape: "/slides/:segment" },
+  );
+  assert.equal(sanitizeUrlShape("https://example.com/slides/secret", "https://example.com"), null);
+});
+
+test("createDiagnosticSnapshot excludes private content and enforces deterministic caps", () => {
+  const candidates = Array.from({ length: 152 }, (_, index) => ({
+    path: `html>body>main:nth-of-type(1)>section:nth-of-type(${index + 1})`,
+    tagName: "section",
+    id: index === 0 ? "slide-container" : `private-${index}`,
+    classes: ["slide-thumbnail", "person@example.com", "customer-project"],
+    attributes: {
+      "data-testid": "slide-card",
+      "aria-label": "Secret Launch Deck",
+      "data-token": "token=private-secret",
+    },
+    role: "region",
+    childElementCount: 3,
+    text: index === 0 ? "Confidential quarterly launch" : "Other private content",
+    bounds: { x: index, y: index, width: 800, height: 450 },
+    display: "block",
+    visibility: "visible",
+    position: "relative",
+    descendantCounts: { canvas: 0, svg: 1, img: 2, iframe: 0, role: 3 },
+  }));
+
+  const repeatedStructures = Array.from({ length: 52 }, (_, index) => ({
+    parentPath: `html>body>main:nth-of-type(1)>div:nth-of-type(${index + 1})`,
+    childSignature: "section:slide-thumbnail",
+    count: 3,
+    representativeBounds: { width: 200, height: 120 },
+  }));
+
+  const snapshot = createDiagnosticSnapshot({
+    url: "https://www.genspark.ai/slides/private-project?token=private-secret#slide",
+    capturedAt: "2026-07-12T12:00:00.000Z",
+    viewport: { width: 1440, height: 900, devicePixelRatio: 2 },
+    documentLanguage: "en-US",
+    title: "Secret Product Launch",
+    bodyChildCount: 4,
+    capabilities: { openShadowRootCount: 0, iframeCount: 1, canvasCount: 2, svgCount: 3, imageCount: 4 },
+    candidates,
+    repeatedStructures,
+  });
+
+  const serialized = JSON.stringify(snapshot);
+  for (const forbidden of [
+    "Secret Product Launch",
+    "Confidential quarterly launch",
+    "Other private content",
+    "person@example.com",
+    "private-secret",
+    "customer-project",
+    "private-project",
+  ]) {
+    assert.doesNotMatch(serialized, new RegExp(forbidden, "i"));
+  }
+
+  assert.equal(snapshot.page.titleLength, "Secret Product Launch".length);
+  assert.equal(snapshot.candidates[0].textLength, "Confidential quarterly launch".length);
+  assert.equal(snapshot.candidates.length, 150);
+  assert.equal(snapshot.repeatedStructures.length, 50);
+  assert.deepEqual(snapshot.page.pathnameShape, "/slides/:segment");
+  assert.deepEqual(snapshot.candidates[0].safeClasses, ["slide-thumbnail"]);
+  assert.deepEqual(snapshot.candidates[0].safeAttributes, [
+    { name: "aria-label", value: null },
+    { name: "data-testid", value: "slide-card" },
+    { name: "data-token", value: null },
+  ]);
 });
